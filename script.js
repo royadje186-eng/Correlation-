@@ -2,127 +2,116 @@ const $ = (id) => document.getElementById(id);
 
 function setStatus(msg) { $("status").textContent = msg; }
 
-// A reasonable “Mataf-style” basket (same idea as their default CSV link).
-// You can expand this list later.
-const SYMBOLS = [
-  "AUDCAD","AUDCHF","AUDJPY","AUDNZD","AUDUSD",
-  "CADCHF","CADJPY","CHFJPY",
-  "EURAUD","EURCAD","EURCHF","EURGBP","EURJPY","EURNZD","EURUSD",
-  "GBPAUD","GBPCAD","GBPCHF","GBPJPY","GBPNZD","GBPUSD",
-  "NZDCAD","NZDCHF","NZDJPY","NZDUSD",
-  "USDCAD","USDCHF","USDJPY"
-];
-
-// This is the CSV API behind “Download CSV” on the Mataf correlation page.  [oai_citation:1‡Mataf](https://www.mataf.net/en/forex/tools/correlation)
-// NOTE: "50" is the "Num Period" used for the snapshot on that page.
-// It’s a daily snapshot by default (1D).
-function buildCsvUrl() {
-  const symbolsParam = encodeURIComponent(SYMBOLS.join("|"));
-  return `https://www.mataf.io/api/tools/csv/correl/snapshot/forex/50/correlation.csv?symbol=${symbolsParam}`;
-}
-
-async function fetchText(url, useProxy) {
-  const finalUrl = useProxy
-    ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
-    : url;
-
-  const res = await fetch(finalUrl);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.text();
-}
-
-// Basic CSV parser (handles commas and semicolons).
 function parseCsv(text) {
-  const sep = text.includes(";") && !text.includes(",") ? ";" : ",";
-  const lines = text.trim().split(/\r?\n/).filter(Boolean);
+  const trimmed = text.trim();
+  if (!trimmed) return [];
 
-  // Split line safely (simple version; Mataf CSV is usually plain)
-  const rows = lines.map(line => line.split(sep).map(s => s.replace(/^"|"$/g, "").trim()));
-  return rows;
+  // Mataf CSV could be comma or semicolon separated
+  const firstLine = trimmed.split(/\r?\n/)[0];
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  const semiCount  = (firstLine.match(/;/g) || []).length;
+  const sep = semiCount > commaCount ? ";" : ",";
+
+  const lines = trimmed.split(/\r?\n/).filter(Boolean);
+
+  // Simple split (works for Mataf-style numeric tables)
+  return lines.map(line =>
+    line.split(sep).map(s => s.replace(/^"|"$/g, "").trim())
+  );
 }
 
-// Build unique pair correlations from a matrix-like CSV.
-// We assume first row is headers: Pair, Pair, Pair...
 function computeTop6(rows) {
   if (rows.length < 2) return [];
 
-  const headers = rows[0].slice(1); // column pair names
-  const results = [];
+  // Expect a matrix:
+  // rows[0] = headers, first cell blank, then pair names
+  // rows[i][0] = row pair name, rows[i][j] = correlation value
+  const headers = rows[0].slice(1).map(x => x.replace(/\s+/g,""));
+
+  const bestByKey = new Map();
 
   for (let i = 1; i < rows.length; i++) {
-    const rowPair = rows[i][0];
+    const rowPair = (rows[i][0] || "").replace(/\s+/g,"");
+    if (!rowPair) continue;
+
     for (let j = 1; j < rows[i].length; j++) {
       const colPair = headers[j - 1];
-      const valRaw = rows[i][j];
-      const corr = Number(String(valRaw).replace("%",""));
+      if (!colPair || rowPair === colPair) continue;
+
+      const raw = (rows[i][j] || "").toString().replace("%","").trim();
+      const corr = Number(raw);
       if (!Number.isFinite(corr)) continue;
-      if (!rowPair || !colPair) continue;
-      if (rowPair === colPair) continue;
 
-      // Make a unique key so (A,B) and (B,A) are treated as one
-      const a = rowPair;
-      const b = colPair;
-      const key = [a,b].sort().join("::");
+      const key = [rowPair, colPair].sort().join("::");
+      const abs = Math.abs(corr);
 
-      results.push({ key, a, b, corr, abs: Math.abs(corr) });
+      const prev = bestByKey.get(key);
+      if (!prev || abs > prev.abs) {
+        bestByKey.set(key, { a: rowPair, b: colPair, corr, abs });
+      }
     }
   }
 
-  // De-dupe by keeping the strongest abs correlation for each unique pair
-  const bestByKey = new Map();
-  for (const r of results) {
-    const prev = bestByKey.get(r.key);
-    if (!prev || r.abs > prev.abs) bestByKey.set(r.key, r);
-  }
-
   return [...bestByKey.values()]
-    .sort((x,y) => y.abs - x.abs)
+    .sort((x, y) => y.abs - x.abs)
     .slice(0, 6);
 }
 
-function renderTop6(list) {
+function render(list) {
   const out = $("out");
   out.innerHTML = "";
+
   if (!list.length) {
-    out.innerHTML = `<div class="card">No results. (Either CSV format changed or fetch was blocked.)</div>`;
+    out.innerHTML = `<div class="result">No results. Make sure you pasted/uploaded the full correlation CSV (matrix table).</div>`;
     return;
   }
 
   list.forEach((x, idx) => {
     const div = document.createElement("div");
-    div.className = "card";
+    div.className = "result";
     div.innerHTML = `
-      <div><strong>#${idx+1} ${x.a} ↔ ${x.b}</strong></div>
-      <div class="small">Correlation (1D snapshot): ${x.corr}% (ranked by absolute value)</div>
+      <div><strong>#${idx + 1} ${x.a} ↔ ${x.b}</strong></div>
+      <div class="small">Correlation (1D): ${x.corr}% (ranked by absolute value)</div>
     `;
     out.appendChild(div);
   });
 }
 
-$("go").addEventListener("click", async () => {
-  const link = $("matafLink").value.trim();
-  const useProxy = $("proxy").checked;
+async function handleCsvText(csvText) {
+  setStatus("Parsing CSV...");
+  const rows = parseCsv(csvText);
 
-  if (!link.includes("mataf.net/en/forex/tools/correlation")) {
-    setStatus("That link doesn’t look like the Mataf correlation page. Paste the correlation page link.");
+  setStatus(`Rows: ${rows.length}\nComputing Top 6...`);
+  const top6 = computeTop6(rows);
+
+  setStatus(`Done. Showing Top ${top6.length} strongest correlations.`);
+  render(top6);
+}
+
+// Upload handler
+$("file").addEventListener("change", async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  setStatus(`Reading file: ${file.name}...`);
+  const text = await file.text();
+  $("csv").value = text; // optional: show it in the textarea
+  await handleCsvText(text);
+});
+
+// Buttons
+$("go").addEventListener("click", async () => {
+  const text = $("csv").value;
+  if (!text.trim()) {
+    setStatus("Paste CSV text or upload a CSV file first.");
     return;
   }
+  await handleCsvText(text);
+});
 
-  const csvUrl = buildCsvUrl();
-
-  try {
-    setStatus(`Fetching Daily (1D) CSV snapshot...\nMode: ${useProxy ? "proxy" : "direct"}\nCSV: ${csvUrl}`);
-    const csvText = await fetchText(csvUrl, useProxy);
-
-    setStatus(`CSV fetched (${csvText.length} chars). Parsing...`);
-    const rows = parseCsv(csvText);
-    const top6 = computeTop6(rows);
-
-    setStatus(`Done. Showing Top ${top6.length} strongest correlations.`);
-    renderTop6(top6);
-  } catch (e) {
-    setStatus(
-      `Failed: ${e.message}\n\nIf this is blocked, tick “Use proxy”.\nIf proxy still fails, the CSV endpoint is blocking browser access and then you’d need a backend OR manual copy/paste mode.`
-    );
-  }
+$("clear").addEventListener("click", () => {
+  $("csv").value = "";
+  $("file").value = "";
+  $("out").innerHTML = "";
+  setStatus("Waiting for CSV…");
 });
