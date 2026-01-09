@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mataf Top 6 Correlations (1D)</title>
+  <title>Mataf Correlations (1D)</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="wrap">
-    <h1>Mataf Top 6 Correlated Pairs (1D)</h1>
+    <h1>Mataf Correlated Pairs (1D)</h1>
 
     <div class="card">
       <p class="small">
@@ -16,6 +16,14 @@
         <br>• Upload the CSV file, or
         <br>• Paste the CSV text below.
       </p>
+    </div>
+
+    <div class="card">
+      <label><strong>Base pair (optional)</strong></label>
+      <input id="base" type="text" placeholder="e.g. NZDUSD (leave blank = global Top 6)" />
+      <div class="small note">
+        Tip: Use the exact pair codes from Mataf (spaces removed). Examples: EURUSD, GBPJPY, NZDCAD.
+      </div>
     </div>
 
     <div class="card">
