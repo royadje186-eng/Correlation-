@@ -12,9 +12,22 @@ function detectSeparator(text) {
 function parseCsvRows(text) {
   const trimmed = text.trim();
   if (!trimmed) return [];
-  const sep = detectSeparator(trimmed);
-  const lines = trimmed.split(/\r?\n/).filter(Boolean);
-  return lines.map(line =>
+
+  const lines = trimmed.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  // Find the real header line (starts with pair1,pair2)
+  const headerIndex = lines.findIndex(line =>
+    line.toLowerCase().startsWith("pair1,") ||
+    line.toLowerCase().startsWith("pair1;")
+  );
+
+  if (headerIndex === -1) return [];
+
+  const dataLines = lines.slice(headerIndex);
+
+  const sep = dataLines[0].includes(";") ? ";" : ",";
+
+  return dataLines.map(line =>
     line.split(sep).map(s => s.replace(/^"|"$/g, "").trim())
   );
 }
