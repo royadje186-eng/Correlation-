@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Top 6 Correlations (1D)</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mataf Top 6 Correlated Pairs (1D)</h1>
+
+    <label>Paste Mataf link</label>
+    <input id="matafLink" value="https://www.mataf.net/en/forex/tools/correlation" />
+
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="proxy"> Use proxy (if blocked)</label>
+      <button id="go">Get Top 6</button>
+    </div>
+
+    <pre id="status"></pre>
+    <div id="out"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
