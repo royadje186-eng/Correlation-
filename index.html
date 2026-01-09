@@ -1,24 +1,39 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Top 6 Correlations (1D)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mataf Top 6 Correlations (1D)</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="wrap">
     <h1>Mataf Top 6 Correlated Pairs (1D)</h1>
 
-    <label>Paste Mataf link</label>
-    <input id="matafLink" value="https://www.mataf.net/en/forex/tools/correlation" />
-
-    <div class="row">
-      <label class="chk"><input type="checkbox" id="proxy"> Use proxy (if blocked)</label>
-      <button id="go">Get Top 6</button>
+    <div class="card">
+      <p class="small">
+        Step 1: Open Mataf → Download CSV (Daily/1D) → then either:
+        <br>• Upload the CSV file, or
+        <br>• Paste the CSV text below.
+      </p>
     </div>
 
-    <pre id="status"></pre>
+    <div class="card">
+      <label><strong>Upload CSV file</strong></label>
+      <input id="file" type="file" accept=".csv,text/csv" />
+    </div>
+
+    <div class="card">
+      <label><strong>Or paste CSV content</strong></label>
+      <textarea id="csv" placeholder="Paste the full CSV here..."></textarea>
+
+      <div class="row">
+        <button id="go">Get Top 6</button>
+        <button id="clear" class="secondary">Clear</button>
+      </div>
+    </div>
+
+    <pre id="status">Waiting for CSV…</pre>
     <div id="out"></div>
   </div>
 
